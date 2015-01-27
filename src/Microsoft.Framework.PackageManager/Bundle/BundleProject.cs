@@ -42,7 +42,7 @@ namespace Microsoft.Framework.PackageManager.Bundle
             root.Reports.Quiet.WriteLine("Using {0} dependency {1} for {2}", _libraryDescription.Type,
                 _libraryDescription.Identity, _libraryDescription.Framework.ToString().Yellow().Bold());
 
-            if (root.NoSource)
+            if (root.NoSource || IsWrappingAssembly())
             {
                 EmitNupkg(root);
             }
@@ -89,14 +89,8 @@ namespace Microsoft.Framework.PackageManager.Bundle
             root.Reports.Quiet.WriteLine("  Packing nupkg from {0} dependency {1}",
                 _libraryDescription.Type, _libraryDescription.Identity.Name);
 
-            Runtime.Project project;
-            if (!_projectResolver.TryResolveProject(_libraryDescription.Identity.Name, out project))
-            {
-                throw new Exception("TODO: unable to resolve project named " + _libraryDescription.Identity.Name);
-            }
-
+            var project = ResolveProject(_libraryDescription.Identity.Name);
             var resolver = new DefaultPackagePathResolver(root.TargetPackagesPath);
-
             var targetNupkg = resolver.GetPackageFileName(project.Name, project.Version);
             TargetPath = resolver.GetInstallPath(project.Name, project.Version);
 
@@ -506,6 +500,64 @@ namespace Microsoft.Framework.PackageManager.Bundle
             var index1 = (relativePath + Path.DirectorySeparatorChar).IndexOf(Path.DirectorySeparatorChar);
             var index2 = (relativePath + Path.AltDirectorySeparatorChar).IndexOf(Path.AltDirectorySeparatorChar);
             return relativePath.Substring(0, Math.Min(index1, index2));
+        }
+
+        private Runtime.Project ResolveProject(string name)
+        {
+            Runtime.Project project;
+            if (!_projectResolver.TryResolveProject(name, out project))
+            {
+                throw new Exception("TODO: unable to resolve project named " + name);
+            }
+            return project;
+        }
+
+        private bool IsWrappingAssembly()
+        {
+            var project = ResolveProject(_libraryDescription.Identity.Name);
+
+            /* If this project is wrapping an assembly, the project.json has the format like:
+            {
+              "frameworks": {
+                "net45": {
+                  "bin": {
+                    "assembly": "relative/path/to/ClassLibrary1.dll"
+                  }
+                }
+              }
+            } */
+            var rootObj = JObject.Parse(File.ReadAllText(project.ProjectFilePath));
+            var frameworksObj = rootObj["frameworks"] as JObject;
+
+            if (frameworksObj == null)
+            {
+                return false;
+            }
+
+            foreach (var frameworkProp in frameworksObj.Properties())
+            {
+                var frameworkObj = frameworkProp.Value as JObject;
+                if (frameworkObj == null)
+                {
+                    return false;
+                }
+
+                var binObj = frameworkObj.Properties()
+                    .FirstOrDefault(x => string.Equals(x.Name, "bin", StringComparison.Ordinal))?.Value as JObject;
+                if (binObj == null)
+                {
+                    return false;
+                }
+
+                if (string.IsNullOrEmpty(binObj["assembly"]?.Value<string>()))
+                {
+                    return false;
+                }
+
+                return true;
+            }
+
+            return false;
         }
     }
 }
