@@ -20,8 +20,7 @@ namespace kre.hosting
 {
     internal static class RuntimeBootstrapper
     {
-        private static readonly ConcurrentDictionary<string, object> _assemblyLoadLocks =
-                new ConcurrentDictionary<string, object>(StringComparer.Ordinal);
+        private static readonly object[] _assemblyLoadLocks = CreateAssemblyLoadLocks(count: 19);
 
         private static readonly ConcurrentDictionary<string, Assembly> _assemblyCache
                 = new ConcurrentDictionary<string, Assembly>(StringComparer.Ordinal);
@@ -179,35 +178,30 @@ namespace kre.hosting
                     return assembly;
                 }
 
-                var loadLock = _assemblyLoadLocks.GetOrAdd(name, new object());
-                try
+                var loadLock = GetAssemblyLoadLock(name);
+
+                // Concurrently loading the assembly might result in two distinct instances of the same assembly 
+                // being loaded. This was observed when loading via Assembly.LoadStream. Prevent this by locking on the name.
+                lock (loadLock)
                 {
-                    // Concurrently loading the assembly might result in two distinct instances of the same assembly 
-                    // being loaded. This was observed when loading via Assembly.LoadStream. Prevent this by locking on the name.
-                    lock (loadLock)
+                    if (_assemblyCache.TryGetValue(name, out assembly))
                     {
-                        if (_assemblyCache.TryGetValue(name, out assembly))
-                        {
-                            // This would succeed in case the thread was previously waiting on the lock when assembly 
-                            // load was in progress
-                            return assembly;
-                        }
+                        // This would succeed in case the thread was previously waiting on the lock when assembly 
+                        // load was in progress
+                        return assembly;
+                    }
 
-                        assembly = loader(name) ?? ResolveHostAssembly(loadFile, searchPaths, name);
+                    assembly = loader(name) ?? ResolveHostAssembly(loadFile, searchPaths, name);
 
-                        if (assembly != null)
-                        {
+                    if (assembly != null)
+                    {
 #if ASPNETCORE50
-                            ExtractAssemblyNeutralInterfaces(assembly, loadStream);
+                        ExtractAssemblyNeutralInterfaces(assembly, loadStream);
 #endif
-                            _assemblyCache[name] = assembly;
-                        }
+                        _assemblyCache[name] = assembly;
                     }
                 }
-                finally
-                {
-                    _assemblyLoadLocks.TryRemove(name, out loadLock);
-                }
+
 
                 return assembly;
             };
@@ -373,7 +367,7 @@ namespace kre.hosting
         {
             foreach (var resourceName in assembly.GetManifestResourceNames())
             {
-                if (resourceName.StartsWith("AssemblyNeutral/") && 
+                if (resourceName.StartsWith("AssemblyNeutral/") &&
                     resourceName.EndsWith(".dll"))
                 {
                     var assemblyName = Path.GetFileNameWithoutExtension(resourceName);
@@ -416,6 +410,23 @@ namespace kre.hosting
                 return assembly.GetName().Version.ToString();
             }
             return assemblyInformationalVersionAttribute.InformationalVersion;
+        }
+
+        private static object GetAssemblyLoadLock(string name)
+        {
+            var bin = Math.Abs(name.GetHashCode() % _assemblyLoadLocks.Length);
+            return _assemblyLoadLocks[bin];
+        }
+
+        private static object[] CreateAssemblyLoadLocks(int count)
+        {
+            var locks = new object[count];
+            for (var i = 0; i < locks.Length; i++)
+            {
+                locks[i] = new object();
+            }
+
+            return locks;
         }
 
         private class CombinedDisposable : IDisposable
