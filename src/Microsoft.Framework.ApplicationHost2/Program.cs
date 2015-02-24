@@ -19,6 +19,7 @@ namespace Microsoft.Framework.ApplicationHost
         private readonly IAssemblyLoaderContainer _container;
         private readonly IApplicationEnvironment _environment;
         private readonly IServiceProvider _serviceProvider;
+        private static readonly Logger Log = Logger.For(nameof(ApplicationHost));
 
         public Program(IAssemblyLoaderContainer container, IApplicationEnvironment environment, IServiceProvider serviceProvider)
         {
@@ -29,7 +30,7 @@ namespace Microsoft.Framework.ApplicationHost
 
         public Task<int> Main(string[] args)
         {
-            Logger.TraceInformation("[ApplicationHost] Application Host Starting");
+            Log.Info("Application Host Starting");
             ApplicationHostOptions options;
             string[] programArgs;
             int exitCode;
@@ -51,12 +52,12 @@ namespace Microsoft.Framework.ApplicationHost
             if (host.Project == null)
             {
                 // No project was found. We can't start the app.
-                Logger.TraceError($"[ApplicationHost] A project.json file was not found in '{options.ApplicationBaseDirectory}'");
+                Console.Error.WriteLine($"A project.json file was not found in '{options.ApplicationBaseDirectory}'");
                 return Task.FromResult(1);
             }
 
             // Get the project and print some information from it
-            Logger.TraceInformation($"[ApplicationHost] Project: {host.Project.Name} ({host.ApplicationBaseDirectory})");
+            Log.Info($"Project: {host.Project.Name} ({host.ApplicationBaseDirectory})");
 
             // Determine the command to be executed
             var command = string.IsNullOrEmpty(options.ApplicationName) ? "run" : options.ApplicationName;
@@ -76,7 +77,7 @@ namespace Microsoft.Framework.ApplicationHost
                 options.ApplicationName = host.Project.EntryPoint ?? host.Project.Name;
             }
 
-            Logger.TraceInformation($"[ApplicationHost] Executing '{options.ApplicationName}' '{string.Join(" ", programArgs)}'");
+            Log.Info($"Executing '{options.ApplicationName}' '{string.Join(" ", programArgs)}'");
 
             return Task.FromResult(0);
         }
@@ -142,7 +143,7 @@ namespace Microsoft.Framework.ApplicationHost
             {
                 // If no subcommand was specified, show error message
                 // and exit immediately with non-zero exit code
-                Logger.TraceError("Please specify the command to run");
+                Console.Error.WriteLine("Please specify the command to run");
                 exitCode = 2;
                 return true;
             }

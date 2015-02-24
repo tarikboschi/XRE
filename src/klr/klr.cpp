@@ -314,23 +314,23 @@ int CallFirmwareProcessMain(int argc, wchar_t* argv[])
     if (!m_hHostModule)
     {
         if (m_fVerboseTrace)
-            ::wprintf_s(L"Failed to load: %s\r\n", pwzHostModuleName);
+            ::wprintf_s(L"error: [klr] Failed to load: %s\r\n", pwzHostModuleName);
         m_hHostModule = nullptr;
         goto Finished;
     }
     if (m_fVerboseTrace)
-        ::wprintf_s(L"Loaded Module: %s\r\n", pwzHostModuleName);
+        ::wprintf_s(L"info : [klr] Loaded Module: %s\r\n", pwzHostModuleName);
 
     pfnCallApplicationMain = (FnCallApplicationMain)::GetProcAddress(m_hHostModule, pszCallApplicationMainName);
     if (!pfnCallApplicationMain)
     {
         if (m_fVerboseTrace)
-            ::wprintf_s(L"Failed to find function %S in %s\n", pszCallApplicationMainName, pwzHostModuleName);
+            ::wprintf_s(L"error: [klr] Failed to find function %S in %s\n", pszCallApplicationMainName, pwzHostModuleName);
         fSuccess = false;
         goto Finished;
     }
     if (m_fVerboseTrace)
-        printf_s("Found DLL Export: %s\r\n", pszCallApplicationMainName);
+        printf_s("info : [klr] Found DLL Export: %s\r\n", pszCallApplicationMainName);
 
     HRESULT hr = pfnCallApplicationMain(&data);
     if (SUCCEEDED(hr))

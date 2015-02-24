@@ -5,8 +5,46 @@ using System;
 
 namespace Microsoft.Framework.Runtime
 {
-    internal static class Logger
+    /// <summary>
+    /// Extremely simple low-level logging facility for runtime
+    /// </summary>
+    internal class Logger
     {
+        private string _name;
+
+        public Logger(string name)
+        {
+            _name = name;
+        }
+
+        public void Error(string message, params object[] args)
+        {
+            if (IsEnabled)
+            {
+                Console.WriteLine($"error: [{_name}] {string.Format(message, args)}");
+            }
+        }
+        public void Info(string message, params object[] args)
+        {
+            if (IsEnabled)
+            {
+                Console.WriteLine($"info : [{_name}] {string.Format(message, args)}");
+            }
+        }
+        public void Warning(string message, params object[] args)
+        {
+            if (IsEnabled)
+            {
+                Console.WriteLine($"warn : [{_name}] {string.Format(message, args)}");
+            }
+        }
+
+        public static Logger For(string name)
+        {
+            return new Logger(name);
+        } 
+        
+        [Obsolete("Use Logger.For to get a named logger instead")]
         public static void TraceError(string message, params object[] args)
         {
             if (IsEnabled)
@@ -15,6 +53,7 @@ namespace Microsoft.Framework.Runtime
             }
         }
 
+        [Obsolete("Use Logger.For to get a named logger instead")]
         public static void TraceInformation(string message, params object[] args)
         {
             if (IsEnabled)
@@ -23,6 +62,7 @@ namespace Microsoft.Framework.Runtime
             }
         }
 
+        [Obsolete("Use Logger.For to get a named logger instead")]
         public static void TraceWarning(string message, params object[] args)
         {
             if (IsEnabled)
