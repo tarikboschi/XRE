@@ -10,7 +10,10 @@ using Microsoft.Framework.ApplicationHost.Impl.Syntax;
 using Microsoft.Framework.Runtime;
 using Microsoft.Framework.Runtime.Common.CommandLine;
 using Microsoft.Framework.Runtime.Hosting;
+using Microsoft.Framework.Runtime.Hosting.DependencyProviders;
 using Newtonsoft.Json.Linq;
+using NuGet.Frameworks;
+using NuGet.ProjectModel;
 
 namespace Microsoft.Framework.ApplicationHost
 {
@@ -44,7 +47,18 @@ namespace Microsoft.Framework.ApplicationHost
             // Construct the necessary context for hosting the application
             var builder = new RuntimeHostBuilder(
                 options.ApplicationBaseDirectory,
-                _container);
+                _container)
+            {
+                TargetFramework = NuGetFramework.ParseFrameworkName(
+                    _environment.RuntimeFramework.FullName, 
+                    DefaultFrameworkNameProvider.Instance)
+            };
+            var projectResolver = new ProjectResolver(
+                builder.ApplicationBaseDirectory,
+                builder.RootDirectory);
+            builder.DependencyProviders.Add(new ProjectReferenceDependencyProvider(projectResolver));
+            var referenceResolver = new FrameworkReferenceResolver();
+            builder.DependencyProviders.Add(new ReferenceAssemblyDependencyResolver(referenceResolver));
 
             // Boot the runtime
             var host = builder.Build();
@@ -58,16 +72,12 @@ namespace Microsoft.Framework.ApplicationHost
             }
 
             // Get the project and print some information from it
-<<<<<<< HEAD
-            Logger.TraceInformation($"[ApplicationHost] Project: {host.Project.Name} ({host.ApplicationBaseDirectory})");
-=======
-            Log.Info($"Created {nameof(RuntimeHost)} for: {host.Project.Name} in {host.ApplicationBaseDirectory}");
->>>>>>> 733fa0e... stash some work
+            Logger.TraceInformation($"[ApplicationHost] Created runtime host ({host.TargetFramework}) for {host.Project.Name} in {host.ApplicationBaseDirectory}");
 
             // Determine the command to be executed
             var command = string.IsNullOrEmpty(options.ApplicationName) ? "run" : options.ApplicationName;
             string replacementCommand;
-            if(host.Project.Commands.TryGetValue(command, out replacementCommand))
+            if (host.Project.Commands.TryGetValue(command, out replacementCommand))
             {
                 var replacementArgs = CommandGrammar.Process(
                     replacementCommand,
@@ -76,19 +86,27 @@ namespace Microsoft.Framework.ApplicationHost
                 programArgs = replacementArgs.Skip(1).Concat(programArgs).ToArray();
             }
 
-            if(string.IsNullOrEmpty(options.ApplicationName) ||
+            if (string.IsNullOrEmpty(options.ApplicationName) ||
                 string.Equals(options.ApplicationName, "run", StringComparison.Ordinal))
             {
                 options.ApplicationName = host.Project.EntryPoint ?? host.Project.Name;
             }
 
-<<<<<<< HEAD
-            Logger.TraceInformation($"[ApplicationHost] Executing '{options.ApplicationName}' '{string.Join(" ", programArgs)}'");
-=======
-            host.LaunchApplication(
-                options.ApplicationName,
-                programArgs);
->>>>>>> 733fa0e... stash some work
+            try
+            {
+                host.LaunchApplication(
+                    options.ApplicationName,
+                    programArgs);
+            }
+            catch (Exception ex)
+            {
+                Logger.TraceError($"[ApplicationHost] {ex.GetType().Name} launching application: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    Logger.TraceError($"[ApplicationHost] Caused by {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
+                }
+                throw;
+            }
 
             return Task.FromResult(0);
         }
@@ -163,7 +181,6 @@ namespace Microsoft.Framework.ApplicationHost
             options.WatchFiles = optionWatch.HasValue();
             options.PackageDirectory = optionPackages.Value();
 
-            options.TargetFramework = _environment.RuntimeFramework;
             options.Configuration = optionConfiguration.Value() ?? _environment.Configuration ?? "Debug";
             options.ApplicationBaseDirectory = _environment.ApplicationBasePath;
             var portValue = optionCompilationServer.Value() ?? Environment.GetEnvironmentVariable(EnvironmentNames.CompilationServerPort);

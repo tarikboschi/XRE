@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Microsoft.Framework.Runtime.FileGlobbing;
 using Newtonsoft.Json.Linq;
 using NuGet.ProjectModel;
+using NuGet.Versioning;
 
 namespace Microsoft.Framework.Runtime.Hosting
 {
@@ -28,6 +29,7 @@ namespace Microsoft.Framework.Runtime.Hosting
         }
 
         public string Name { get { return Metadata.Name; } }
+        public NuGetVersion Version { get { return Metadata.Version; } }
         public ProjectFilesCollection Files { get; }
         public PackageSpec Metadata { get; }
         public string EntryPoint { get; }
