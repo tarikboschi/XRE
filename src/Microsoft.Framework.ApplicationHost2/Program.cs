@@ -42,7 +42,9 @@ namespace Microsoft.Framework.ApplicationHost
 
 
             // Construct the necessary context for hosting the application
-            var builder = new RuntimeHostBuilder(options.ApplicationBaseDirectory);
+            var builder = new RuntimeHostBuilder(
+                options.ApplicationBaseDirectory,
+                _container);
 
             // Boot the runtime
             var host = builder.Build();
@@ -56,7 +58,11 @@ namespace Microsoft.Framework.ApplicationHost
             }
 
             // Get the project and print some information from it
+<<<<<<< HEAD
             Logger.TraceInformation($"[ApplicationHost] Project: {host.Project.Name} ({host.ApplicationBaseDirectory})");
+=======
+            Log.Info($"Created {nameof(RuntimeHost)} for: {host.Project.Name} in {host.ApplicationBaseDirectory}");
+>>>>>>> 733fa0e... stash some work
 
             // Determine the command to be executed
             var command = string.IsNullOrEmpty(options.ApplicationName) ? "run" : options.ApplicationName;
@@ -76,7 +82,13 @@ namespace Microsoft.Framework.ApplicationHost
                 options.ApplicationName = host.Project.EntryPoint ?? host.Project.Name;
             }
 
+<<<<<<< HEAD
             Logger.TraceInformation($"[ApplicationHost] Executing '{options.ApplicationName}' '{string.Join(" ", programArgs)}'");
+=======
+            host.LaunchApplication(
+                options.ApplicationName,
+                programArgs);
+>>>>>>> 733fa0e... stash some work
 
             return Task.FromResult(0);
         }
