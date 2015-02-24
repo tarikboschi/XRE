@@ -10,6 +10,11 @@ namespace Microsoft.Framework.Runtime
     /// </summary>
     internal class Logger
     {
+        private static int? _level;
+        private const int OffLevel = 0;
+        private const int InfoLevel = 1;
+        private const int TraceLevel = 2;
+
         private string _name;
 
         public Logger(string name)
@@ -19,21 +24,28 @@ namespace Microsoft.Framework.Runtime
 
         public void Error(string message, params object[] args)
         {
-            if (IsEnabled)
+            if (IsErrorEnabled)
             {
                 Console.WriteLine($"error: [{_name}] {string.Format(message, args)}");
             }
         }
+        public void Trace(string message, params object[] args)
+        {
+            if (IsTraceEnabled)
+            {
+                Console.WriteLine($"trace: [{_name}] {string.Format(message, args)}");
+            }
+        }
         public void Info(string message, params object[] args)
         {
-            if (IsEnabled)
+            if (IsInfoEnabled)
             {
                 Console.WriteLine($"info : [{_name}] {string.Format(message, args)}");
             }
         }
         public void Warning(string message, params object[] args)
         {
-            if (IsEnabled)
+            if (IsWarningEnabled)
             {
                 Console.WriteLine($"warn : [{_name}] {string.Format(message, args)}");
             }
@@ -42,40 +54,28 @@ namespace Microsoft.Framework.Runtime
         public static Logger For(string name)
         {
             return new Logger(name);
-        } 
-        
-        [Obsolete("Use Logger.For to get a named logger instead")]
-        public static void TraceError(string message, params object[] args)
-        {
-            if (IsEnabled)
-            {
-                Console.WriteLine("Error: " + message, args);
-            }
         }
 
-        [Obsolete("Use Logger.For to get a named logger instead")]
-        public static void TraceInformation(string message, params object[] args)
-        {
-            if (IsEnabled)
-            {
-                Console.WriteLine("Information: " + message, args);
-            }
-        }
+        private static bool IsErrorEnabled { get { return Level >= InfoLevel; } }
+        private static bool IsWarningEnabled { get { return Level >= InfoLevel; } }
+        private static bool IsInfoEnabled { get { return Level >= InfoLevel; } }
+        private static bool IsTraceEnabled { get { return Level >= TraceLevel; } }
 
-        [Obsolete("Use Logger.For to get a named logger instead")]
-        public static void TraceWarning(string message, params object[] args)
-        {
-            if (IsEnabled)
-            {
-                Console.WriteLine("Warning: " + message, args);
-            }
-        }
-
-        private static bool IsEnabled
+        private static int Level
         {
             get
             {
-                return Environment.GetEnvironmentVariable(EnvironmentNames.Trace) == "1";
+                if(_level == null)
+                {
+                    string levelStr = Environment.GetEnvironmentVariable(EnvironmentNames.Trace);
+                    int newLevel;
+                    if(string.IsNullOrEmpty(levelStr) || !int.TryParse(levelStr, out newLevel))
+                    {
+                        newLevel = OffLevel;
+                    }
+                    _level = newLevel;
+                }
+                return _level.Value;
             }
         }
     }

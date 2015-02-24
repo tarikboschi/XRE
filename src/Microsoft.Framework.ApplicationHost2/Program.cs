@@ -77,7 +77,7 @@ namespace Microsoft.Framework.ApplicationHost
                 options.ApplicationName = host.Project.EntryPoint ?? host.Project.Name;
             }
 
-            Log.Info($"Executing '{options.ApplicationName}' '{string.Join(" ", programArgs)}'");
+            Log.Trace($"Executing '{options.ApplicationName}' '{string.Join(" ", programArgs)}'");
 
             return Task.FromResult(0);
         }
