@@ -70,6 +70,7 @@ namespace Microsoft.Framework.Runtime.DependencyManagement
         {
             var lockFile = new LockFile();
             lockFile.Islocked = ReadBool(cursor, "locked", defaultValue: false);
+            lockFile.FrameworkDependencies = ReadObject(cursor["frameworkDependencies"] as JObject, ReadFrameworkDependencies);
             lockFile.Libraries = ReadObject(cursor["libraries"] as JObject, ReadLibrary);
             return lockFile;
         }
@@ -79,8 +80,16 @@ namespace Microsoft.Framework.Runtime.DependencyManagement
             var json = new JObject();
             json["locked"] = new JValue(lockFile.Islocked);
             json["version"] = new JValue(1);
+            json["frameworkDependencies"] = WriteObject(lockFile.FrameworkDependencies, WriteFrameworkDependencies);
             json["libraries"] = WriteObject(lockFile.Libraries, WriteLibrary);
             return json;
+        }
+
+        private KeyValuePair<string, IEnumerable<string>> ReadFrameworkDependencies(string property, JToken json)
+        {
+            return new KeyValuePair<string, IEnumerable<string>>(
+                property,
+                ReadArray(json as JArray, ReadString));
         }
 
         private LockFileLibrary ReadLibrary(string property, JToken json)
@@ -111,6 +120,13 @@ namespace Microsoft.Framework.Runtime.DependencyManagement
             return new JProperty(
                 library.Name + "/" + library.Version.ToString(),
                 json);
+        }
+
+        private JProperty WriteFrameworkDependencies(KeyValuePair<string, IEnumerable<string>> frameworkDependencies)
+        {
+            return new JProperty(
+                frameworkDependencies.Key,
+                WriteArray(frameworkDependencies.Value, WriteString));
         }
 
         private IList<FrameworkAssemblyReference> ReadFrameworkAssemblies(JObject json)

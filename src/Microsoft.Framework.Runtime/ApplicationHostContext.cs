@@ -8,7 +8,9 @@ using Microsoft.Framework.Runtime.Common.DependencyInjection;
 using Microsoft.Framework.Runtime.FileSystem;
 using Microsoft.Framework.Runtime.Loader;
 using Microsoft.Framework.Runtime.DependencyManagement;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using NuGet;
 
 namespace Microsoft.Framework.Runtime
@@ -43,21 +45,30 @@ namespace Microsoft.Framework.Runtime
             var unresolvedDependencyProvider = new UnresolvedDependencyProvider();
 
             var projectLockJsonPath = Path.Combine(ProjectDirectory, LockFileFormat.LockFileName);
-            if (File.Exists(projectLockJsonPath))
+            var lockFileExists = File.Exists(projectLockJsonPath);
+            var validLockFile = false;
+
+            if (lockFileExists)
             {
                 var lockFileFormat = new LockFileFormat();
                 var lockFile = lockFileFormat.Read(projectLockJsonPath);
-                NuGetDependencyProvider.ApplyLockFile(lockFile);
+                validLockFile = IsValidLockFile(lockFile);
 
-                DependencyWalker = new DependencyWalker(new IDependencyProvider[] {
-                    ProjectDepencyProvider,
-                    NuGetDependencyProvider,
-                    referenceAssemblyDependencyResolver,
-                    gacDependencyResolver,
-                    unresolvedDependencyProvider
-                });
+                if (validLockFile)
+                {
+                    NuGetDependencyProvider.ApplyLockFile(lockFile);
+
+                    DependencyWalker = new DependencyWalker(new IDependencyProvider[] {
+                        ProjectDepencyProvider,
+                        NuGetDependencyProvider,
+                        referenceAssemblyDependencyResolver,
+                        gacDependencyResolver,
+                        unresolvedDependencyProvider
+                    });
+                }
             }
-            else
+
+            if (!lockFileExists || !validLockFile)
             {
                 DependencyWalker = new DependencyWalker(new IDependencyProvider[] {
                     ProjectDepencyProvider,
@@ -97,6 +108,55 @@ namespace Microsoft.Framework.Runtime
 
             var compilerOptionsProvider = new CompilerOptionsProvider(ProjectResolver);
             _serviceProvider.Add(typeof(ICompilerOptionsProvider), compilerOptionsProvider);
+        }
+
+        private bool IsValidLockFile(LockFile lockFile)
+        {
+            var project = Project;
+
+            // The lock file should contain dependencies for each framework plus dependencies shared by all frameworks
+            if (lockFile.FrameworkDependencies.Count != project.GetTargetFrameworks().Count() + 1)
+            {
+                return false;
+            }
+
+            foreach (var pair in lockFile.FrameworkDependencies)
+            {
+                IEnumerable<string> projectJsonDependencies;
+                var lockFileDependencies = pair.Value;
+
+                if (string.IsNullOrEmpty(pair.Key))
+                {
+                    // If the framework name is empty, the associated dependencies are shared by all frameworks
+                    projectJsonDependencies = project.Dependencies.Select(x => x.LibraryRange.ToString());
+                }
+                else
+                {
+                    var projectJsonFrameworkInfo = project.GetTargetFrameworks()
+                        .FirstOrDefault(x => string.Equals(pair.Key, x.FrameworkName.ToString()));
+                    if (projectJsonFrameworkInfo == null)
+                    {
+                        return false;
+                    }
+
+                    projectJsonDependencies = projectJsonFrameworkInfo.Dependencies
+                        .Select(x => x.LibraryRange.ToString());
+                }
+
+                var extra = lockFileDependencies.Except(projectJsonDependencies);
+                if (extra.Any())
+                {
+                    return false;
+                }
+
+                var missing = projectJsonDependencies.Except(lockFileDependencies);
+                if (missing.Any())
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         public void AddService(Type type, object instance, bool includeInManifest)
